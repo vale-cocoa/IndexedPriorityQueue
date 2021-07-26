@@ -18,6 +18,7 @@
 //  IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 //
 
+/// - Todo: Change the whole logic to adopt indices always in range `0..<count`
 public struct IndexedPriorityQueue<Element> {
     internal fileprivate(set) var storage: Storage<Element>
     

@@ -364,7 +364,48 @@ final class IndexedPriorityQueueTests: XCTestCase {
     
     // MARK: - subscript tests
     func testSubscriptGetter_whenKeyIsNotAssociatedToAnElement_thenReturnsNil() {
-        XCTFail("Not yet implemented")
+        for i in 0..<sut.capacity {
+            XCTAssertNil(sut[i])
+        }
+        
+        let elements = givenElements.shuffled()
+        sut.enqueue(contentsOf: elements)
+        for i in sut.count..<sut.capacity {
+            XCTAssertNil(sut[i])
+        }
+    }
+    
+    func testSubscriptGetter_whenKeyIsAssociatedToAnElement_thenReturnsSuchElement() {
+        let elements = givenElements.shuffled()
+        sut.enqueue(contentsOf: elements)
+        for i in 0..<sut.count {
+            XCTAssertEqual(sut[i], elements[i])
+        }
+    }
+    
+    func testSubscriptSetter_whenKeyHasNotAssociatedElementAndNewValueIsNil_thenNothingChnages() {
+        sut.enqueue(contentsOf: givenElements)
+        let expectedElements = Dictionary(uniqueKeysWithValues: Array(givenElements.enumerated()))
+        for i in sut.count..<sut.capacity {
+            let prevCount = sut.count
+            sut[i] = nil
+            XCTAssertEqual(sut.count, prevCount)
+            assertContainsAtSameIndices(expectedElements)
+        }
+    }
+    
+    func testSubscriptSetter_whenKeyHasNotAssociatedElementAndNewValueIsNotNil_thenStoresSuchNewElementAssociatingItToGivenKey() {
+        sut.enqueue(contentsOf: givenElements)
+        var expectedElements = Dictionary(uniqueKeysWithValues: Array(givenElements.enumerated()))
+        var newElement = "zz"
+        for i in sut.count..<sut.capacity {
+            expectedElements[i] = newElement
+            let prevCount = sut.count
+            sut[i] = newElement
+            XCTAssertEqual(sut.count, prevCount + 1)
+            newElement += "z"
+        }
+        assertContainsAtSameIndices(expectedElements)
     }
     
     // MARK: - Helpers
