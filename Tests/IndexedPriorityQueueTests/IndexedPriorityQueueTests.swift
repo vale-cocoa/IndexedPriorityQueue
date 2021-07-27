@@ -505,6 +505,21 @@ final class IndexedPriorityQueueTests: XCTestCase {
         }
     }
     
+    func testIterator_returnsElementsInSameOrderDequeuesThem() {
+        let elements = givenElements.shuffled()
+        sut.enqueue(contentsOf: elements)
+        var result = [String]()
+        for (_, element) in sut {
+            result.append(element)
+        }
+        var idx = 0
+        while !sut.isEmpty {
+            let element = sut.dequeue()
+            XCTAssertEqual(element, result[idx])
+            idx += 1
+        }
+    }
+    
     // MARK: - Helpers
     private func assertContainsAtSameIndices(_ elements: Dictionary<Int, String>, file: StaticString = #file, line: UInt = #line) {
         for idx in elements.keys {
