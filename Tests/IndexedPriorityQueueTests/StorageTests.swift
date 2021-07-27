@@ -48,7 +48,7 @@ final class StorageTest: XCTestCase {
         return buff.compactMap({ $0 })
     }
     
-    var sutElementsWithIndex: [Int : String] {
+    var sutElementsWithKey: [Int : String] {
         guard
             sut != nil,
             !sut.isEmpty
@@ -216,7 +216,7 @@ final class StorageTest: XCTestCase {
         XCTAssertEqual(sut.optimalCapacity, sut.capacity)
     }
     
-    func testOptimalCapacity_whenResidualCapacityIsMoreThanHalfCapacity_thenReturnsValueGreaterThanOrEqualToGreatestAssociatedIndexPlusOne() throws {
+    func testOptimalCapacity_whenResidualCapacityIsMoreThanHalfCapacity_thenReturnsValueGreaterThanOrEqualToGreatestAssociatedKeyPlusOne() throws {
         whenIsLessThanHalfFull(sort: <)
         var expectedValue = sut.capacity - 1
         while expectedValue >= 0 {
@@ -249,7 +249,7 @@ final class StorageTest: XCTestCase {
         try XCTSkipIf(expectedValue <= 0)
         XCTAssertGreaterThanOrEqual(sut.optimalCapacity, expectedValue)
         
-        // Let's also check it out when the greatest associated index is a larger value
+        // Let's also check it out when the greatest associated key is a larger value
         // than half capacity:
         whenIsLessThanHalfFull(sort: <)
         expectedValue = (sut.capacity / 2) + 2
@@ -488,7 +488,7 @@ final class StorageTest: XCTestCase {
     }
     
     // MARK: - C.R.U.D. tests
-    func testGetElementAt_whenIsEmpty_thenReturnsNilForAnyIndex() {
+    func testGetElementAt_whenIsEmpty_thenReturnsNilForAnyKey() {
         whenIsEmpty(sort: <)
         for idx in 0..<sut.capacity {
             XCTAssertNil(sut.getElement(for: idx))
@@ -500,7 +500,7 @@ final class StorageTest: XCTestCase {
         }
     }
     
-    func testGetElementAt_whenIsNotEmpty_thenReturnsAppropriateElementAssociatedToIndexOrNilIfIndexHasNotAssociatedElement() {
+    func testGetElementAt_whenIsNotEmpty_thenReturnsAppropriateElementAssociatedToKeyOrNilIfKeyHasNotAssociatedElement() {
         whenIsNotEmpty(sort: <)
         for idx in 0..<sut.capacity {
             guard
@@ -527,7 +527,7 @@ final class StorageTest: XCTestCase {
         
     }
     
-    func testSetElementAt_whenElementIsNotNilAndIndexIsNotInUse_thenSetsElementForThatIndexIncreasesCountByOneAndReturnsNil() {
+    func testSetElementAt_whenElementIsNotNilAndKeyIsNotInUse_thenSetsElementForThatKeyIncreasesCountByOneAndReturnsNil() {
         whenIsEmpty(sort: <)
         for idx in 0..<sut.capacity {
             let prevCount = sut.count
@@ -545,7 +545,7 @@ final class StorageTest: XCTestCase {
         }
     }
     
-    func testSetElementAt_whenElementIsNotNilAndIndexIsInUse_thenReplacesOldElementWithNewOneAndReturnsOldElement() throws {
+    func testSetElementAt_whenElementIsNotNilAndKeyIsInUse_thenReplacesOldElementWithNewOneAndReturnsOldElement() throws {
         whenIsNotEmpty(sort: <)
         for idx in givenElements.indices {
             try XCTSkipIf(sut.getElement(for: idx) == nil)
@@ -568,7 +568,7 @@ final class StorageTest: XCTestCase {
         
     }
     
-    func testSetElement_whenElementIsNilAndIndexIsNotInUse_thenNothingChangesAndReturnsNil() throws {
+    func testSetElement_whenElementIsNilAndKeyIsNotInUse_thenNothingChangesAndReturnsNil() throws {
         whenIsNotEmpty(sort: <)
         for idx in givenElements.endIndex..<sut.capacity {
             try XCTSkipIf(sut.getElement(for: idx) != nil)
@@ -588,7 +588,7 @@ final class StorageTest: XCTestCase {
         }
     }
     
-    func testSetElement_whenElementIsNilAndIndexIsInUse_thenRemovesAndReturnsSuchElement() throws {
+    func testSetElement_whenElementIsNilAndKeyIsInUse_thenRemovesAndReturnsSuchElement() throws {
         whenIsNotEmpty(sort: <)
         for idx in givenElements.indices {
             try XCTSkipIf(sut.getElement(for: idx) == nil)
@@ -619,7 +619,7 @@ final class StorageTest: XCTestCase {
         XCTAssertNil(sut.peek())
     }
     
-    func testPeek_whenIsNotEmpty_thenReturnsFirstElementInHeapAndItsIndex() throws {
+    func testPeek_whenIsNotEmpty_thenReturnsFirstElementInHeapAndItsKey() throws {
         let elements = givenElements.shuffled()
         sut = Storage(elements.count, sort: <)
         for (idx, element) in elements.enumerated() {
@@ -631,8 +631,8 @@ final class StorageTest: XCTestCase {
             let expectedElement = sut.elements.advanced(by: expectedIdx).pointee
             let result = sut.peek()
             XCTAssertEqual(result!.element, expectedElement)
-            XCTAssertEqual(result!.index, expectedIdx)
-            sut.setElement(nil, for: result!.index)
+            XCTAssertEqual(result!.key, expectedIdx)
+            sut.setElement(nil, for: result!.key)
         }
         
         sut = Storage(elements.count, sort: >)
@@ -645,20 +645,20 @@ final class StorageTest: XCTestCase {
             let expectedElement = sut.elements.advanced(by: expectedIdx).pointee
             let result = sut.peek()
             XCTAssertEqual(result!.element, expectedElement)
-            XCTAssertEqual(result!.index, expectedIdx)
-            sut.setElement(nil, for: result!.index)
+            XCTAssertEqual(result!.key, expectedIdx)
+            sut.setElement(nil, for: result!.key)
         }
     }
     
-    func testPush_insertsElementAtSmallestAvailableIndex() {
+    func testPush_insertsElementAtSmallestAvailableKey() {
         sut = Storage(givenElements.count, sort: <)
         for idx in givenElements.indices.shuffled() {
-            let prevElements = sutElementsWithIndex
+            let prevElements = sutElementsWithKey
             let prevCount = sut.count
-            let smallestIndex = UnsafeBufferPointer(start: sut.qp, count: sut.capacity).firstIndex(where: { $0 == -1 })
-            let usedIndex = sut.push(givenElements[idx])
-            XCTAssertEqual(smallestIndex, usedIndex)
-            XCTAssertEqual(sut.getElement(for: usedIndex), givenElements[idx])
+            let smallestKey = UnsafeBufferPointer(start: sut.qp, count: sut.capacity).firstIndex(where: { $0 == -1 })
+            let usedKey = sut.push(givenElements[idx])
+            XCTAssertEqual(smallestKey, usedKey)
+            XCTAssertEqual(sut.getElement(for: usedKey), givenElements[idx])
             XCTAssertEqual(sut.count, prevCount + 1)
             assertContainsAtSameIndices(prevElements)
             assertHeapProperty()
@@ -666,32 +666,32 @@ final class StorageTest: XCTestCase {
         
         sut = Storage(givenElements.count, sort: >)
         for idx in givenElements.indices.shuffled() {
-            let prevElements = sutElementsWithIndex
+            let prevElements = sutElementsWithKey
             let prevCount = sut.count
-            let smallestIndex = UnsafeBufferPointer(start: sut.qp, count: sut.capacity).firstIndex(where: { $0 == -1 })
-            let usedIndex = sut.push(givenElements[idx])
-            XCTAssertEqual(smallestIndex, usedIndex)
-            XCTAssertEqual(sut.getElement(for: usedIndex), givenElements[idx])
+            let smallestKey = UnsafeBufferPointer(start: sut.qp, count: sut.capacity).firstIndex(where: { $0 == -1 })
+            let usedKey = sut.push(givenElements[idx])
+            XCTAssertEqual(smallestKey, usedKey)
+            XCTAssertEqual(sut.getElement(for: usedKey), givenElements[idx])
             XCTAssertEqual(sut.count, prevCount + 1)
             assertContainsAtSameIndices(prevElements)
             assertHeapProperty()
         }
     }
     
-    func testPop_returnsFirstElementInHeapAndItsIndex() {
+    func testPop_returnsFirstElementInHeapAndItsKey() {
         sut = Storage(givenElements.count, sort: <)
         var expected = [Int : String]()
         for idx in givenElements.indices.shuffled() {
-            let insertionIdx = sut.push(givenElements[idx])
-            expected[insertionIdx] = givenElements[idx]
+            let insertionKey = sut.push(givenElements[idx])
+            expected[insertionKey] = givenElements[idx]
         }
         while !sut.isEmpty {
-            var expectedElements = sutElementsWithIndex
+            var expectedElements = sutElementsWithKey
             let prevCount = sut.count
             let popped = sut.pop()
             XCTAssertEqual(sut.count, prevCount - 1)
-            XCTAssertEqual(popped.element, expected[popped.index])
-            expectedElements.removeValue(forKey: popped.index)
+            XCTAssertEqual(popped.element, expected[popped.key])
+            expectedElements.removeValue(forKey: popped.key)
             assertContainsAtSameIndices(expectedElements)
             assertHeapProperty()
         }
@@ -699,16 +699,16 @@ final class StorageTest: XCTestCase {
         sut = Storage(givenElements.count, sort: <)
         expected = [Int : String]()
         for idx in givenElements.indices.shuffled() {
-            let insertionIdx = sut.push(givenElements[idx])
-            expected[insertionIdx] = givenElements[idx]
+            let insertionKey = sut.push(givenElements[idx])
+            expected[insertionKey] = givenElements[idx]
         }
         while !sut.isEmpty {
-            var expectedElements = sutElementsWithIndex
+            var expectedElements = sutElementsWithKey
             let prevCount = sut.count
             let popped = sut.pop()
             XCTAssertEqual(sut.count, prevCount - 1)
-            XCTAssertEqual(popped.element, expected[popped.index])
-            expectedElements.removeValue(forKey: popped.index)
+            XCTAssertEqual(popped.element, expected[popped.key])
+            expectedElements.removeValue(forKey: popped.key)
             assertContainsAtSameIndices(expectedElements)
             assertHeapProperty()
         }

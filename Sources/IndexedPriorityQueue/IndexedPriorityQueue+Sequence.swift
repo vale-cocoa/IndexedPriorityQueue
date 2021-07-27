@@ -19,27 +19,28 @@
 //
 
 extension IndexedPriorityQueue: Sequence {
-    internal struct StorageIterator: IteratorProtocol {
-        internal var indexedPQ: IndexedPriorityQueue
+    fileprivate struct StorageIterator: IteratorProtocol {
+        fileprivate var indexedPQ: IndexedPriorityQueue
         
-        internal init(indexedPQ: IndexedPriorityQueue) {
+        fileprivate init(indexedPQ: IndexedPriorityQueue) {
             self.indexedPQ = indexedPQ
         }
         
-        internal mutating func next() -> (index: Int, element: Element)? {
-            guard
-                !indexedPQ.isEmpty
-            else { return nil }
+        fileprivate mutating func next() -> (key: Int, element: Element)? {
+            defer {
+                indexedPQ.dequeue()
+            }
             
-            return indexedPQ.storage.pop()
+            return indexedPQ.storage.peek()
         }
         
     }
     
     public var underestimatedCount: Int { storage.count }
     
-    public func makeIterator() -> AnyIterator<(index: Int, element: Element)> {
+    public func makeIterator() -> AnyIterator<(key: Int, element: Element)> {
         AnyIterator(StorageIterator(indexedPQ: self))
     }
     
 }
+

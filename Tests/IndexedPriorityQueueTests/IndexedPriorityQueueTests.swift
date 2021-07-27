@@ -118,6 +118,38 @@ final class IndexedPriorityQueueTests: XCTestCase {
         XCTAssertTrue(sut.isFull)
     }
     
+    func testUsedKeys() {
+        XCTAssertEqual(sut.usedKeys.isEmpty, sut.isEmpty)
+        let expectedElements = givenElements.shuffled()
+        sut.enqueue(contentsOf: expectedElements)
+        let usedKeys = sut.usedKeys
+        XCTAssertFalse(usedKeys.isEmpty)
+        for key in usedKeys {
+            XCTAssertEqual(sut[key], expectedElements[key])
+        }
+        for _ in 0..<usedKeys.count / 2 {
+            let rKey = usedKeys.randomElement()!
+            sut[rKey] = nil
+        }
+        let newUsedKeys = sut.usedKeys
+        XCTAssertNotEqual(usedKeys, newUsedKeys)
+        for key in newUsedKeys {
+            XCTAssertEqual(sut[key], expectedElements[key])
+        }
+        let freedKeys = usedKeys.filter({ !newUsedKeys.contains($0) })
+        for key in freedKeys {
+            XCTAssertNil(sut[key])
+        }
+    }
+    
+    func testStoredElements() {
+        XCTAssertEqual(sut.isEmpty, sut.storedElements.isEmpty)
+        let expectedElements = givenElements.shuffled()
+        sut.enqueue(contentsOf: expectedElements)
+        let storedElements = sut.storedElements
+        XCTAssertEqual(storedElements, expectedElements)
+    }
+    
     // MARK: - Public methods tests
     // MARK: - reserveCapacity(_:) tests
     func testReserveCapacity() {
@@ -445,6 +477,32 @@ final class IndexedPriorityQueueTests: XCTestCase {
         clone = sut!
         sut[idx] = "zzz"
         XCTAssertFalse(sut.storage === clone.storage)
+    }
+    
+    // MARK: - Sequence conformance tests
+    func testUnderestimatedCount() {
+        sut.enqueue(contentsOf: givenElements)
+        while !sut.isEmpty {
+            XCTAssertEqual(sut.underestimatedCount, sut.storage.count)
+            let _ = sut.dequeue()
+            XCTAssertEqual(sut.underestimatedCount, sut.storage.count)
+        }
+    }
+    
+    func testMakeIterator() {
+        var iter = sut.makeIterator()
+        XCTAssertNotNil(iter)
+        XCTAssertNil(iter.next())
+        
+        let expectedElements = givenElements.shuffled()
+        sut.enqueue(contentsOf: expectedElements)
+        iter = sut.makeIterator()
+        XCTAssertNotNil(iter)
+        while let (key, element) = iter.next() {
+            XCTAssertEqual(sut.storedElements, expectedElements)
+            XCTAssertEqual(element, expectedElements[key])
+            XCTAssertEqual(sut.storedElements, expectedElements)
+        }
     }
     
     // MARK: - Helpers

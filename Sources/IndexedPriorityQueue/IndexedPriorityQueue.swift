@@ -45,6 +45,17 @@ extension IndexedPriorityQueue {
     
     public var isFull: Bool { storage.isFull }
     
+    public var usedKeys: [Int] {
+        UnsafeBufferPointer(start: storage.qp, count: storage.capacity)
+            .compactMap({
+                $0 == -1 ? nil : storage.pq.advanced(by: $0).pointee
+            })
+    }
+    
+    public var storedElements: [Element] {
+        UnsafeBufferPointer(start: storage.elements, count: capacity).compactMap({ $0 })
+    }
+    
 }
 
 // MARK: - Public methods
@@ -54,6 +65,7 @@ extension IndexedPriorityQueue {
         makeUnique(reservingCapacity: minimumCapacity)
     }
     
+    @discardableResult
     public func peek() -> Element? {
         storage.peek()?.element
     }
@@ -94,6 +106,7 @@ extension IndexedPriorityQueue {
         }
     }
     
+    @discardableResult
     public mutating func dequeue() -> Element? {
         defer {
             storage.optimizeCapacity()

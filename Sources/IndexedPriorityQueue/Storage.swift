@@ -94,7 +94,7 @@ extension Storage {
             residualCapacity > capacity / 2
         else { return capacity }
         
-        let proposedCapacity = _largestAssociatedIdx! + 1
+        let proposedCapacity = _largestUsedKey! + 1
         
         return Self._convenientCapacityFor(capacity: proposedCapacity)
     }
@@ -129,17 +129,17 @@ extension Storage {
 extension Storage {
     @usableFromInline
     @discardableResult
-    func getElement(for index: Int) -> Element? {
-        _validateIndex(index)
+    func getElement(for key: Int) -> Element? {
+        _validateKey(key)
         
-        return elements.advanced(by:index).pointee
+        return elements.advanced(by:key).pointee
     }
     
     @usableFromInline
     @discardableResult
-    func setElement(_ element: Element?, for index: Int) -> Element? {
-        _validateIndex(index)
-        let slot = qp.advanced(by: index).pointee
+    func setElement(_ element: Element?, for key: Int) -> Element? {
+        _validateKey(key)
+        let slot = qp.advanced(by: key).pointee
         if let newElement = element {
             // We have to either set a new element or change one already stored at this index
             guard
@@ -148,9 +148,9 @@ extension Storage {
                 // It's a new element that must be added to the heap
                 assert(!isFull, "Trying to add new element in a full storage")
                 defer {
-                    qp.advanced(by: index).pointee = count
-                    pq.advanced(by: count).initialize(to: index)
-                    elements.advanced(by: index).pointee = newElement
+                    qp.advanced(by: key).pointee = count
+                    pq.advanced(by: count).initialize(to: key)
+                    elements.advanced(by: key).pointee = newElement
                     _siftUp(from: count)
                     count += 1
                 }
@@ -161,9 +161,9 @@ extension Storage {
             // newElement goes in place of a previous stored element,
             // let's get the old element, return it and then change it with
             // the newElement mainining the heap property
-            let oldElement = elements.advanced(by: index).pointee
+            let oldElement = elements.advanced(by: key).pointee
             defer {
-                elements.advanced(by: index).pointee = newElement
+                elements.advanced(by: key).pointee = newElement
                 _siftUp(from: slot)
                 _siftDown(from: slot)
             }
@@ -179,15 +179,15 @@ extension Storage {
             
             // get stored element and after returning it effectively
             // delete it maintaining heap property
-            let oldElement = elements.advanced(by: index).pointee
+            let oldElement = elements.advanced(by: key).pointee
             defer {
                 _swapAt(slot, count - 1)
                 count -= 1
                 _siftUp(from: slot)
                 _siftDown(from: slot)
-                elements.advanced(by: index).pointee = nil
+                elements.advanced(by: key).pointee = nil
                 pq.advanced(by: count).deinitialize(count: 1)
-                qp.advanced(by: index).pointee = -1
+                qp.advanced(by: key).pointee = -1
             }
             
             return oldElement
@@ -200,7 +200,7 @@ extension Storage {
 extension Storage {
     @usableFromInline
     @discardableResult
-    func peek() -> (index: Int, element: Element)? {
+    func peek() -> (key: Int, element: Element)? {
         guard !isEmpty else { return nil }
         
         let idx = pq.pointee
@@ -211,8 +211,8 @@ extension Storage {
     @usableFromInline
     @discardableResult
     func push(_ element: Element) -> Int {
-        assert(!isFull, "Attempting to add an element to a full storage")
-        let idx = _smallestFreeIdx!
+        assert(!isFull, "Attempting to push an element into a full storage")
+        let idx = _smallestFreeKey!
         
         defer {
             qp.advanced(by: idx).pointee = count
@@ -227,7 +227,7 @@ extension Storage {
     
     @usableFromInline
     @discardableResult
-    func pop() -> (index: Int, element: Element) {
+    func pop() -> (key: Int, element: Element) {
         assert(!isEmpty, "Attempting to pop an element from an empty storage")
         let min = pq.pointee
         defer {
@@ -335,7 +335,7 @@ extension Storage {
     }
     
     @inline(__always)
-    fileprivate var _smallestFreeIdx: Int? {
+    fileprivate var _smallestFreeKey: Int? {
         guard !isEmpty else { return 0 }
         
         guard !isFull else { return nil }
@@ -353,7 +353,7 @@ extension Storage {
     }
     
     @inline(__always)
-    fileprivate var _largestAssociatedIdx: Int? {
+    fileprivate var _largestUsedKey: Int? {
         guard !isEmpty else { return nil }
         
         guard !isFull else { return capacity - 1 }
@@ -371,7 +371,7 @@ extension Storage {
     }
     
     @inline(__always)
-    fileprivate func _validateIndex(_ index: Int) {
+    fileprivate func _validateKey(_ index: Int) {
         precondition(0..<capacity ~= index, "index: \(index) is out bounds 0..<\(capacity)")
     }
     
@@ -396,8 +396,8 @@ extension Storage {
             #if DEBUG
             // …we should have already checked that we won't leave any stored element
             // behind here:
-            if let lastIDX = _largestAssociatedIdx {
-                assert(lastIDX < newCapacity)
+            if let lastKey = _largestUsedKey {
+                assert(lastKey < newCapacity)
             }
             #endif
             
