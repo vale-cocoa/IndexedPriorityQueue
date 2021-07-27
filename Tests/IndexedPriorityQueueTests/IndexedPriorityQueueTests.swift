@@ -408,6 +408,45 @@ final class IndexedPriorityQueueTests: XCTestCase {
         assertContainsAtSameIndices(expectedElements)
     }
     
+    func testSubscriptSetter_whenKeyHasAssociatedElementAndNewValueIsNil_thenRemovesElement() {
+        sut.enqueue(contentsOf: givenElements.shuffled())
+        for i in 0..<sut.count {
+            let prevCount = sut.count
+            sut[i] = nil
+            XCTAssertNil(sut[i])
+            XCTAssertEqual(sut.count, prevCount - 1)
+        }
+        XCTAssertTrue(sut.isEmpty)
+    }
+    
+    func testSubscriptSetter_whenKeyHasAssociatedElementAndNewValueIsNotNil_thenChangesElementAssociatedToGivenKey() {
+        sut.enqueue(contentsOf: givenElements.shuffled())
+        var newElement = "z"
+        for i in 0..<sut.count {
+            newElement += "z"
+            let prevCount = sut.count
+            sut[i] = newElement
+            XCTAssertEqual(sut[i], newElement)
+            XCTAssertEqual(sut.count, prevCount)
+        }
+    }
+    
+    func testSubscriptSetter_CopyOnWrite() {
+        sut.enqueue(contentsOf: givenElements)
+        var clone = sut!
+        let idx = Int.random(in: 0..<sut.capacity)
+        sut[idx] = nil
+        XCTAssertFalse(sut.storage === clone.storage)
+        
+        clone = sut!
+        sut[idx] = "zz"
+        XCTAssertFalse(sut.storage === clone.storage)
+        
+        clone = sut!
+        sut[idx] = "zzz"
+        XCTAssertFalse(sut.storage === clone.storage)
+    }
+    
     // MARK: - Helpers
     private func assertContainsAtSameIndices(_ elements: Dictionary<Int, String>, file: StaticString = #file, line: UInt = #line) {
         for idx in elements.keys {
