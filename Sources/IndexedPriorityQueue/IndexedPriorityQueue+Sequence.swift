@@ -27,7 +27,11 @@ extension IndexedPriorityQueue: Sequence {
         }
         
         fileprivate mutating func next() -> (key: Int, element: Element)? {
-            indexedPQ.popTopMost()
+            defer {
+                indexedPQ.dequeue()
+            }
+            
+            return indexedPQ.storage.peek()
         }
         
     }

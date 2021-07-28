@@ -155,4 +155,10 @@ extension IndexedPriorityQueue: Queue {
         return storage.pop()
     }
     
+    public func containsKey(_ key: Int) -> Bool {
+        guard 0..<capacity ~= key else { return false }
+        
+        return storage.qp.advanced(by: key).pointee != -1
+    }
+    
 }
