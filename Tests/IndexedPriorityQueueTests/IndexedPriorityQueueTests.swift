@@ -318,12 +318,12 @@ final class IndexedPriorityQueueTests: XCTestCase {
         sut = IndexedPriorityQueue(minimumCapacity: 0, sort: <)
         var clone = sut!
         
-        let _ = sut.dequeue()
+        sut.dequeue()
         XCTAssertTrue(sut.storage === clone.storage)
         
         sut.enqueue(contentsOf: givenElements)
         clone = sut!
-        let _ = sut.dequeue()
+        sut.dequeue()
         XCTAssertFalse(sut.storage === clone.storage)
     }
     
@@ -331,20 +331,20 @@ final class IndexedPriorityQueueTests: XCTestCase {
         sut = IndexedPriorityQueue(minimumCapacity: 0, sort: <)
         XCTAssertEqual(sut.storage.optimalCapacity, sut.capacity)
         var prevCapacity = sut.capacity
-        let _ = sut.dequeue()
+        sut.dequeue()
         XCTAssertEqual(sut.capacity, prevCapacity)
         
         sut.reserveCapacity(10)
         XCTAssertLessThan(sut.storage.optimalCapacity, sut.capacity)
         prevCapacity = sut.capacity
-        let _ = sut.dequeue()
+        sut.dequeue()
         XCTAssertLessThan(sut.capacity, prevCapacity)
         
         sut.enqueue(contentsOf: givenElements)
         sut.reserveCapacity(32)
         prevCapacity = sut.capacity
         XCTAssertGreaterThan((sut.storage.residualCapacity + 1), sut.capacity / 2)
-        let _ = sut.dequeue()
+        sut.dequeue()
         XCTAssertLessThan(sut.capacity, prevCapacity)
     }
     
@@ -484,7 +484,7 @@ final class IndexedPriorityQueueTests: XCTestCase {
         sut.enqueue(contentsOf: givenElements)
         while !sut.isEmpty {
             XCTAssertEqual(sut.underestimatedCount, sut.storage.count)
-            let _ = sut.dequeue()
+            sut.dequeue()
             XCTAssertEqual(sut.underestimatedCount, sut.storage.count)
         }
     }
@@ -514,7 +514,7 @@ final class IndexedPriorityQueueTests: XCTestCase {
         }
         var idx = 0
         while !sut.isEmpty {
-            let element = sut.dequeue()
+            let element: String? = sut.dequeue()
             XCTAssertEqual(element, result[idx])
             idx += 1
         }

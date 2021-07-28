@@ -54,12 +54,12 @@ final class StorageTest: XCTestCase {
             !sut.isEmpty
         else { return [:] }
         
-        let buff = UnsafeBufferPointer(start: sut.elements, count: sut.count)
+        let buff = UnsafeBufferPointer(start: sut.qp, count: sut.capacity)
         var result: [Int : String] = [:]
         for (idx, value) in buff.enumerated() {
-            guard let value = value else { continue }
+            guard value != -1 else { continue }
             
-            result[idx] = value
+            result[idx] = sut.elements.advanced(by: idx).pointee
         }
         
         return result
@@ -120,7 +120,6 @@ final class StorageTest: XCTestCase {
         XCTAssertNotNil(sut.qp)
         XCTAssertEqual(sut.sort("a", "b"), ("a" < "b"))
         for idx in 0..<sut.capacity {
-            XCTAssertNil(sut.elements.advanced(by:idx).pointee)
             XCTAssertEqual(sut.qp.advanced(by: idx).pointee, -1)
         }
         assertHeapProperty()
@@ -192,12 +191,12 @@ final class StorageTest: XCTestCase {
         XCTAssertTrue(sut.isFull)
     }
     
-    func testOptimalCapacity_whenIsEmpty_thenReturns4() {
+    func testOptimalCapacity_whenIsEmpty_thenReturnsMinimumBufferCapacity() {
         whenIsEmpty(sort: <)
-        XCTAssertEqual(sut.optimalCapacity, 4)
+        XCTAssertEqual(sut.optimalCapacity, Storage<String>.minCapacity)
         
         whenIsEmpty(sort: >)
-        XCTAssertEqual(sut.optimalCapacity, 4)
+        XCTAssertEqual(sut.optimalCapacity, Storage<String>.minCapacity)
     }
     
     func testOptimalCapacity_whenIsFull_thenReturnsGreaterCapacity() {
@@ -549,9 +548,9 @@ final class StorageTest: XCTestCase {
         whenIsNotEmpty(sort: <)
         for idx in givenElements.indices {
             try XCTSkipIf(sut.getElement(for: idx) == nil)
-            let expectedValue = givenElements[idx]
+            let expectedOldValue = givenElements[idx]
             let prevCount = sut.count
-            XCTAssertEqual(sut.setElement("z", for: idx), expectedValue)
+            XCTAssertEqual(sut.setElement("z", for: idx), expectedOldValue)
             XCTAssertEqual(sut.count, prevCount)
             assertHeapProperty()
         }
@@ -559,9 +558,9 @@ final class StorageTest: XCTestCase {
         whenIsNotEmpty(sort: >)
         for idx in givenElements.indices {
             try XCTSkipIf(sut.getElement(for: idx) == nil)
-            let expectedValue = givenElements[idx]
+            let expectedOldValue = givenElements[idx]
             let prevCount = sut.count
-            XCTAssertEqual(sut.setElement("z", for: idx), expectedValue)
+            XCTAssertEqual(sut.setElement("z", for: idx), expectedOldValue)
             XCTAssertEqual(sut.count, prevCount)
             assertHeapProperty()
         }
@@ -717,43 +716,22 @@ final class StorageTest: XCTestCase {
     // MARK: - Utilities
     private func assertHeapProperty(file: StaticString = #file, line: UInt = #line) {
         func isHeapPropertyRespected(parent: Int = 0) -> Bool {
-            guard
-                let parentElement = sut.elements[sut.pq[parent]]
-            else {
-                XCTFail("Got a nil element as parent", file: file, line: line)
-                
-                return false
-            }
-            
+            let parentElement = sut.elements[sut.pq[parent]]
             var result = true
             let leftChild = (2 * parent) + 1
             let rightChild = (2 * parent) + 2
             if leftChild < sut.count {
-                guard
-                    let leftChildElement = sut.elements[sut.pq[leftChild]]
-                else {
-                    XCTFail("Got a nil element as left child", file: file, line: line)
-                    
-                    return false
-                }
-                
+                let leftChildElement = sut.elements[sut.pq[leftChild]]
                 result = !sut.sort(leftChildElement, parentElement)
-                if result {
+                if result == true {
                     result = isHeapPropertyRespected(parent: leftChild)
                 }
             }
             
-            if result && rightChild < sut.count {
-                guard
-                    let rightChildElement = sut.elements[sut.pq[rightChild]]
-                else {
-                    XCTFail("Got a nil element", file: file, line: line)
-                    
-                    return false
-                }
-                
+            if result == true && rightChild < sut.count {
+                let rightChildElement = sut.elements[sut.pq[rightChild]]
                 result = !sut.sort(rightChildElement, parentElement)
-                if result {
+                if result == true {
                     result = isHeapPropertyRespected(parent: rightChild)
                 }
             }

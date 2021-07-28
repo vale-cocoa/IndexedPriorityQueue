@@ -27,7 +27,7 @@ final internal class Storage<Element> {
     
     internal fileprivate(set) var count: Int
     
-    internal fileprivate(set) var elements: UnsafeMutablePointer<Element?>
+    internal fileprivate(set) var elements: UnsafeMutablePointer<Element>
     
     internal fileprivate(set) var pq: UnsafeMutablePointer<Int>
     
@@ -37,7 +37,6 @@ final internal class Storage<Element> {
         let realCapacity = Self._convenientCapacityFor(capacity: capacity)
         self.capacity = realCapacity
         self.elements = UnsafeMutablePointer.allocate(capacity: realCapacity)
-        self.elements.initialize(repeating: nil, count: realCapacity)
         self.pq = UnsafeMutablePointer.allocate(capacity: realCapacity)
         self.qp = UnsafeMutablePointer.allocate(capacity: realCapacity)
         self.qp.initialize(repeating: -1, count: realCapacity)
@@ -46,7 +45,17 @@ final internal class Storage<Element> {
     }
     
     deinit {
-        self.elements.deinitialize(count: capacity)
+        var deInitSize = 0
+        for i in 0..<capacity {
+            guard qp.advanced(by: 1).pointee != -1 else {
+                if deInitSize > 0 {
+                    elements.advanced(by: i).deinitialize(count: deInitSize)
+                    deInitSize = 0
+                }
+                continue
+            }
+            deInitSize += 1
+        }
         self.elements.deallocate()
         self.pq.deinitialize(count: count)
         self.pq.deallocate()
@@ -54,10 +63,10 @@ final internal class Storage<Element> {
         self.qp.deallocate()
     }
     
-    fileprivate init(capacity: Int, count: Int, keys: UnsafeMutablePointer<Element?>, pq: UnsafeMutablePointer<Int>, qp: UnsafeMutablePointer<Int>, sort: @escaping (Element, Element) -> Bool) {
+    fileprivate init(capacity: Int, count: Int, elements: UnsafeMutablePointer<Element>, pq: UnsafeMutablePointer<Int>, qp: UnsafeMutablePointer<Int>, sort: @escaping (Element, Element) -> Bool) {
         self.capacity = capacity
         self.count = count
-        self.elements = keys
+        self.elements = elements
         self.pq = pq
         self.qp = qp
         self.sort = sort
@@ -82,7 +91,7 @@ extension Storage {
     internal var optimalCapacity: Int {
         guard
             !isEmpty
-        else { return Self._minCapacity }
+        else { return Self.minCapacity }
         
         guard
             !isFull
@@ -108,14 +117,13 @@ extension Storage {
         let newCapacity = residualCapacity >= minimumCapacity ? capacity : Self._convenientCapacityFor(capacity: (capacity + (minimumCapacity - residualCapacity)))
         let newPQ = UnsafeMutablePointer<Int>.allocate(capacity: newCapacity)
         newPQ.moveInitialize(from: pq, count: count)
-        let newKeys = UnsafeMutablePointer<Element?>.allocate(capacity: newCapacity)
+        let newKeys = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
         newKeys.moveInitialize(from: elements, count: capacity)
-        newKeys.advanced(by: capacity).initialize(repeating: nil, count: newCapacity - capacity)
         let newQP = UnsafeMutablePointer<Int>.allocate(capacity: newCapacity)
         newQP.moveInitialize(from: qp, count: capacity)
         newQP.advanced(by: capacity).initialize(repeating: -1, count: newCapacity - capacity)
         
-        return Self.init(capacity: newCapacity, count: count, keys: newKeys, pq: newPQ, qp: newQP, sort: sort)
+        return Self.init(capacity: newCapacity, count: count, elements: newKeys, pq: newPQ, qp: newQP, sort: sort)
     }
     
     @usableFromInline
@@ -131,6 +139,7 @@ extension Storage {
     @discardableResult
     func getElement(for key: Int) -> Element? {
         _validateKey(key)
+        guard qp.advanced(by: key).pointee != -1 else { return nil }
         
         return elements.advanced(by:key).pointee
     }
@@ -150,7 +159,7 @@ extension Storage {
                 defer {
                     qp.advanced(by: key).pointee = count
                     pq.advanced(by: count).initialize(to: key)
-                    elements.advanced(by: key).pointee = newElement
+                    elements.advanced(by: key).initialize(to: newElement)
                     _siftUp(from: count)
                     count += 1
                 }
@@ -185,7 +194,7 @@ extension Storage {
                 count -= 1
                 _siftUp(from: slot)
                 _siftDown(from: slot)
-                elements.advanced(by: key).pointee = nil
+                elements.advanced(by: key).deinitialize(count: 1)
                 pq.advanced(by: count).deinitialize(count: 1)
                 qp.advanced(by: key).pointee = -1
             }
@@ -205,7 +214,7 @@ extension Storage {
         
         let idx = pq.pointee
         
-        return (idx, elements.advanced(by: idx).pointee!)
+        return (idx, elements.advanced(by: idx).pointee)
     }
     
     @usableFromInline
@@ -217,7 +226,7 @@ extension Storage {
         defer {
             qp.advanced(by: idx).pointee = count
             pq.advanced(by: count).initialize(to: idx)
-            elements.advanced(by: idx).pointee = element
+            elements.advanced(by: idx).initialize(to: element)
             _siftUp(from: count)
             count += 1
         }
@@ -235,11 +244,11 @@ extension Storage {
             count -= 1
             _siftDown(from: 0)
             qp.advanced(by: min).pointee = -1
-            elements.advanced(by: min).pointee = nil
+            elements.advanced(by: min).deinitialize(count: 1)
             pq.advanced(by: count).deinitialize(count: 1)
         }
         
-        return (min, elements.advanced(by: min).pointee!)
+        return (min, elements.advanced(by: min).pointee)
     }
     
 }
@@ -267,7 +276,7 @@ extension Storage {
         let lhs = elements.advanced(by: pq.advanced(by: i).pointee).pointee
         let rhs = elements.advanced(by: pq.advanced(by: j).pointee).pointee
         
-        return sort(lhs!, rhs!)
+        return sort(lhs, rhs)
     }
     
     @inline(__always)
@@ -317,8 +326,8 @@ extension Storage {
 
 // MARK: - Capacity helpers
 extension Storage {
-    @inline(__always)
-    fileprivate static var _minCapacity: Int { 4 }
+    @inlinable
+    internal static var minCapacity: Int { 4 }
     
     // Returns the next power of 2 for given capacity value, or minCapacity for
     // a given value less than or equal to 2.
@@ -327,7 +336,7 @@ extension Storage {
     fileprivate static func _convenientCapacityFor(capacity: Int) -> Int {
         precondition(capacity >= 0, "Negative capacity values are not allowed.")
         
-        guard capacity > (_minCapacity >> 1) else { return _minCapacity }
+        guard capacity > (minCapacity >> 1) else { return minCapacity }
         
         guard capacity < ((Int.max >> 1) + 1) else { return Int.max }
         
@@ -383,12 +392,13 @@ extension Storage {
         newPQ.moveInitialize(from: pq, count: count)
         pq.deallocate()
         pq = newPQ
-        let newElements = UnsafeMutablePointer<Element?>.allocate(capacity: newCapacity)
+        let newElements = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
+        _moveInitializeFromElements(to: newElements)
+        elements.deallocate()
+        elements = newElements
         let newQP = UnsafeMutablePointer<Int>.allocate(capacity: newCapacity)
         if newCapacity > capacity {
             // We are increasing capacity… Easy peasy!
-            newElements.moveInitialize(from: elements, count: capacity)
-            newElements.advanced(by: capacity).initialize(repeating: nil, count: newCapacity - capacity)
             newQP.moveInitialize(from: qp, count: capacity)
             newQP.advanced(by: capacity).initialize(repeating: -1, count: newCapacity - capacity)
         } else {
@@ -401,16 +411,34 @@ extension Storage {
             }
             #endif
             
-            newElements.moveInitialize(from: elements, count: newCapacity)
-            elements.advanced(by: newCapacity).deinitialize(count: capacity - newCapacity)
             newQP.moveInitialize(from: qp, count: newCapacity)
             pq.advanced(by: newCapacity).deinitialize(count: capacity - newCapacity)
         }
-        elements.deallocate()
-        elements = newElements
         qp.deallocate()
         qp = newQP
         capacity = newCapacity
+    }
+    
+}
+
+// MARK: - other helpers
+extension Storage {
+    @inline(__always)
+    fileprivate func _deInitializeElements() {
+        guard !isEmpty else { return }
+        
+        for i in 0..<capacity where qp.advanced(by: i).pointee != -1 {
+            elements.advanced(by: i).deinitialize(count: 1)
+        }
+    }
+    
+    @inline(__always)
+    fileprivate func _moveInitializeFromElements(to newBuffer: UnsafeMutablePointer<Element>) {
+        guard !isEmpty else { return }
+        
+        for i in 0..<capacity where qp.advanced(by: i).pointee != -1 {
+            newBuffer.advanced(by: i).moveInitialize(from: elements.advanced(by: i), count: 1)
+        }
     }
     
 }

@@ -18,7 +18,6 @@
 //  IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 //
 
-/// - Todo: Change the whole logic to adopt indices always in range `0..<count`
 public struct IndexedPriorityQueue<Element> {
     internal fileprivate(set) var storage: Storage<Element>
     
@@ -53,8 +52,13 @@ extension IndexedPriorityQueue {
     }
     
     public var storedElements: [Element] {
-        UnsafeBufferPointer(start: storage.elements, count: capacity).compactMap({ $0 })
+        UnsafeBufferPointer(start: storage.qp, count: storage.capacity)
+            .compactMap({
+                $0 == -1 ? nil : storage.elements.advanced(by: storage.pq.advanced(by: $0).pointee).pointee
+            })
     }
+    
+    public var topMost: (key: Int, element: Element)? { storage.peek() }
     
 }
 
@@ -118,6 +122,17 @@ extension IndexedPriorityQueue {
         makeUnique()
         
         return storage.pop().element
+    }
+    
+    @discardableResult
+    public mutating func popTopMost() -> (key: Int, element: Element)? {
+        guard
+            !storage.isEmpty
+        else { return nil }
+        
+        makeUnique()
+        
+        return storage.pop()
     }
     
     public mutating func clear(keepingCapacity keepCapacity: Bool) {
