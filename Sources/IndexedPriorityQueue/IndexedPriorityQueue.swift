@@ -18,6 +18,8 @@
 //  IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 //
 
+import Queue
+
 public struct IndexedPriorityQueue<Element> {
     internal fileprivate(set) var storage: Storage<Element>
     
@@ -62,8 +64,8 @@ extension IndexedPriorityQueue {
     
 }
 
-// MARK: - Public methods
-extension IndexedPriorityQueue {
+// MARK: - Public methods & Queue conformance
+extension IndexedPriorityQueue: Queue {
     public mutating func reserveCapacity(_ minimumCapacity: Int) {
         precondition(minimumCapacity >= 0, "minimumCapacity parameter must not be negative.")
         makeUnique(reservingCapacity: minimumCapacity)
@@ -124,17 +126,6 @@ extension IndexedPriorityQueue {
         return storage.pop().element
     }
     
-    @discardableResult
-    public mutating func popTopMost() -> (key: Int, element: Element)? {
-        guard
-            !storage.isEmpty
-        else { return nil }
-        
-        makeUnique()
-        
-        return storage.pop()
-    }
-    
     public mutating func clear(keepingCapacity keepCapacity: Bool) {
         if isEmpty && keepCapacity { return }
         let c = keepCapacity ? storage.capacity : 0
@@ -151,6 +142,17 @@ extension IndexedPriorityQueue {
             makeUnique()
             storage.setElement(newValue, for: key)
         }
+    }
+    
+    @discardableResult
+    public mutating func popTopMost() -> (key: Int, element: Element)? {
+        guard
+            !storage.isEmpty
+        else { return nil }
+        
+        makeUnique()
+        
+        return storage.pop()
     }
     
 }
