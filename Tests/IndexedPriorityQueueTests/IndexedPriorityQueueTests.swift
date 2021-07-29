@@ -150,6 +150,19 @@ final class IndexedPriorityQueueTests: XCTestCase {
         XCTAssertEqual(storedElements, expectedElements)
     }
     
+    func testTopMost() {
+        XCTAssertTrue(sut.isEmpty)
+        XCTAssertNil(sut.topMost)
+        let elements = givenElements.shuffled()
+        for element in elements {
+            sut.enqueue(element)
+            let expected = sut.storage.peek()
+            let topMost = sut.topMost
+            XCTAssertEqual(expected!.key, topMost!.key)
+            XCTAssertEqual(expected!.element, topMost!.element)
+        }
+    }
+    
     // MARK: - Public methods tests
     // MARK: - reserveCapacity(_:) tests
     func testReserveCapacity() {
@@ -517,6 +530,69 @@ final class IndexedPriorityQueueTests: XCTestCase {
             let element: String? = sut.dequeue()
             XCTAssertEqual(element, result[idx])
             idx += 1
+        }
+    }
+    
+    func testPopTopMost() {
+        for element in givenElements.shuffled() {
+            sut.enqueue(element)
+        }
+        
+        while !sut.isEmpty {
+            let expected = sut.storage.peek()
+            let result = sut.popTopMost()
+            XCTAssertEqual(result?.key, expected!.key)
+            XCTAssertEqual(result?.element, expected!.element)
+        }
+        XCTAssertNil(sut.popTopMost())
+    }
+    
+    func testPopTopMost_COW() {
+        for element in givenElements.shuffled() {
+            sut.enqueue(element)
+        }
+        while !sut.isEmpty {
+            let clone = sut!
+            sut.popTopMost()
+            XCTAssertFalse(sut.storage === clone.storage)
+        }
+        
+        // when is empty:
+        let clone = sut!
+        sut.popTopMost()
+        XCTAssertTrue(sut.storage === clone.storage)
+    }
+    
+    func testContainsKey_whenIsEmpty_thenReturnsFalse() throws {
+        try XCTSkipIf(!sut.isEmpty)
+        for key in 0..<sut.capacity {
+            XCTAssertFalse(sut.containsKey(key))
+        }
+    }
+    
+    func testContainsKey_whenIsFull_thenReturnsTrue() throws {
+        for i in 0..<sut.capacity {
+            sut[i] = givenElements[i]
+        }
+        try XCTSkipIf(!sut.isFull)
+        for key in 0..<sut.capacity {
+            XCTAssertTrue(sut.containsKey(key))
+        }
+    }
+    
+    func testContainsKey_whenContainsSomeelements_thenReturnsResultAccordinglyToGivenKeyBeingAssociatedWithAnElementOrFree() {
+        sut.reserveCapacity(givenElements.count)
+        let usedKeys = Set(givenElements.indices.shuffled()[0..<(givenElements.count / 2)])
+        for key in usedKeys {
+            sut[key] = givenElements[key]
+        }
+        
+        for key in 0..<sut.capacity {
+            if usedKeys.contains(key) {
+                XCTAssertTrue(sut.containsKey(key))
+            } else {
+                XCTAssertFalse(sut.containsKey(key))
+            }
         }
     }
     
