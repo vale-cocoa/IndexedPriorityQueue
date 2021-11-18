@@ -20,9 +20,46 @@
 
 import Queue
 
+/// A Swift implementation of *Indexed Priority Queue* data structure.
+///
+/// `IndexedPriorityQueue` is a priority queue data structure which also associates
+/// every stored element to an non-negative `Int` value, defined as its *key*.
+/// That is elements can be accessed via enqueue/dequeue in priority order or via *key-based* subscription.
+///
+/// Traditionally the term *key* has been widely used referring to the *elements* stored in this type
+/// of data structure; though in this implementation the term *key* refers to the `Int` value
+/// associated to a stored *element*.
+/// That is in this data structure the term  *element* refers to what is traditionally called a *key*,
+/// while the term *key* referes to what is traditionally called an *index* in an indexed priority queue.
+///
+/// Priority of one element over another is defined via a *strict ordering function* given at creation time and
+/// invariable during the life time of an instance.
+///
+/// Such that given `sort` as the ordering function, then for any elements `a`, `b`, and `c`,
+/// the following conditions must hold:
+/// -   `sort(a, a)` is always `false`. (Irreflexivity)
+/// -   If `sort(a, b)` and `sort(b, c)` are both `true`,
+///     then `sort(a, c)` is also `true`. ( Transitive comparability)
+/// -   Two elements are *incomparable* if neither is ordered before the other according to the sort function.
+/// -   If `a` and `b` are incomparable, and `b` and `c` are incomparable, then `a` and `c`
+///     are also incomparable. (Transitive incomparability)
 public struct IndexedPriorityQueue<Element> {
     internal fileprivate(set) var storage: Storage<Element>
     
+    /// Instanciate a new empty indexed priority queue, able to store
+    /// at least the number of elements specified as `minimumCapacity`
+    /// without having to reallocate its memory and adopting the comparator
+    /// specified as `sort:` parameter for calcutating the sorting —priority based—
+    ///  between two elements.
+    ///
+    ///- Parameter minimumCapacity: The minimum number of elements this indexed priority queue will
+    ///                             be able to store withouth having to reallocate its memory.
+    ///                             **Must not be negative**.
+    ///                             Note that the returned instance might have a real capacity
+    ///                             greater than the value specified as this parameter.
+    /// - Parameter sort:   A closure that given two elements returns either `true` if they are sorted,
+    ///                     or `false` if they aren't sorted.
+    ///                     Must be a *strict weak ordering function* over the elements.
     public init(minimumCapacity: Int, sort: @escaping(Element, Element) -> Bool) {
         self.storage = Storage(minimumCapacity, sort: sort)
     }
@@ -46,6 +83,9 @@ extension IndexedPriorityQueue {
     
     public var isFull: Bool { storage.isFull }
     
+    /// An array of non-negative `Int` values representing the keys in use by this indexed priority queue.
+    ///
+    /// - Complexity: O(*N*) where *N* is the *capacity* of this indexed priority queue.
     public var usedKeys: [Int] {
         UnsafeBufferPointer(start: storage.qp, count: storage.capacity)
             .compactMap({
@@ -53,6 +93,10 @@ extension IndexedPriorityQueue {
             })
     }
     
+    /// An array containing all the elements stored in this indexed priority queue.
+    ///
+    /// The order of elements in this array doesn't refelct the priority order of the queue.
+    /// - Complexity: O(*N*) where *N* is the *capacity* of this indexed priority queue.
     public var storedElements: [Element] {
         UnsafeBufferPointer(start: storage.qp, count: storage.capacity)
             .compactMap({
@@ -60,6 +104,11 @@ extension IndexedPriorityQueue {
             })
     }
     
+    /// An optional tuple containing the *top most* element of this indexed priority queue,
+    /// that is the element with the highest priority stored in this indexed priority queue, and the key
+    /// value associated with it. This value is `nil`  when the indexed priority queue is empty.
+    ///
+    /// - Complexity: O(1)
     public var topMost: (key: Int, element: Element)? { storage.peek() }
     
 }
@@ -76,11 +125,26 @@ extension IndexedPriorityQueue: Queue {
         storage.peek()?.element
     }
     
+    /// Stores specified element in this indexed priority queue, associating the specified element to
+    /// the smallest key available .
+    ///
+    /// - Parameter element:    The element to store.
+    /// - Complexity: O(log(*n*) where *n* is the lenght of this indexed priority queue.
+    /// - Note: The indexed priority queue will associate the given element with the smallest
+    ///         available key, that is the `Int`  value not yet associated with an element already
+    ///         contained in the indexed priority queue before the new element is enqueued.
     public mutating func enqueue(_ element: Element) {
         makeUnique(reservingCapacity: 1)
         storage.push(element)
     }
     
+    /// Stores in this indexed priority queue all elements contained in the given sequence,
+    /// associating them progressively to the smallest key available.
+    ///
+    /// - Parameter contentsOf: The sequence of elements to store.
+    /// - Complexity:   O(*m* \* *N* ), where *N* and *m* are respectively
+    ///                 the `capacity` of this indexed priority queue,
+    ///                 and the lenght of the given sequence of new elements to insert.
     public mutating func enqueue<S: Sequence>(contentsOf newElements: S) where S.Iterator.Element == Element {
         let done: Bool = newElements.withContiguousStorageIfAvailable({ buffer in
             guard
@@ -113,6 +177,13 @@ extension IndexedPriorityQueue: Queue {
     }
     
     @discardableResult
+    /// Removes and returns the first element of the queue, or `nil` when the queue is empty.
+    /// When an element is effectively removed and returned from the indexed priority queue,
+    /// than the to which it was associated becomes also available again for associating it to a new
+    /// element.
+    ///
+    /// - Returns: the first element of the queue, or `nil` when the queue is empty.
+    /// - Complexity: O(log *n*), where *n* is the count of elements stored in this indexed priority queue.
     public mutating func dequeue() -> Element? {
         defer {
             storage.optimizeCapacity()
@@ -133,6 +204,15 @@ extension IndexedPriorityQueue: Queue {
         storage = Storage(c, sort: s)
     }
     
+    /// Returns an element associated to the given key, if such key has an element associated.
+    ///
+    /// - Parameter key: An `Int` value, that is the key to lookup in this indexed priority queue.
+    ///                     **Must be in range** `0..<capacity>`.
+    /// - Returns: An element stored in the indexed priority queue for that key if such has an element
+    ///            associated to it. Otherwise `nil`.
+    /// - Complexity: O(log *N*) where *N* is the `capacity` value of this indexed priority queue.
+    /// - Warning: The value passed as `key` parameter must be in range `0..<capacity>`,
+    ///             otherwise a runtime error occurs.
     public subscript(key: Int) -> Element? {
         get {
             storage.getElement(for: key)
@@ -145,6 +225,14 @@ extension IndexedPriorityQueue: Queue {
     }
     
     @discardableResult
+    /// Removes and returns the stored element with the highest priority and the key it was associated to.
+    /// When the indexed priority queue is empty, then returns `nil`.
+    ///
+    /// - Returns:  An optional tuple containing the stored element with the highest priority
+    ///             and the key it was associated to. `nil` if the indexed priority queue is empty.
+    /// - Note: When an element and its associated key are removed and returned, then such key
+    ///         becomes once again available to be associated to a new element.
+    /// - Complexity: O(log *n*), where *n* is the count of elements stored in this indexed priority queue.
     public mutating func popTopMost() -> (key: Int, element: Element)? {
         guard
             !storage.isEmpty
@@ -155,6 +243,15 @@ extension IndexedPriorityQueue: Queue {
         return storage.pop()
     }
     
+    /// Check if the specified `key` has been associated to an element in this indexed priority queue.
+    ///
+    /// - Parameter key:    An `Int` value representing the key to check.
+    ///                     **Must be in range** `0..<capacity>`.
+    /// - Returns:  A boolean value: `true` if the specified `key` parameter is
+    ///             associated to a stored element in this indexed priority queue, `false` otherwise.
+    /// - Warning:  The specified parameter `key` must be in range `0..<capacity>`,
+    ///             otherwise a runtime error occurs.
+    /// - Complexity: O(1).
     public func containsKey(_ key: Int) -> Bool {
         storage.getElement(for: key) != nil
     }
