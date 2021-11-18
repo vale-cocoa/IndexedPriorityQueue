@@ -60,6 +60,7 @@ public struct IndexedPriorityQueue<Element> {
     /// - Parameter sort:   A closure that given two elements returns either `true` if they are sorted,
     ///                     or `false` if they aren't sorted.
     ///                     Must be a *strict weak ordering function* over the elements.
+    /// - Precondition: The value specified as `minimumCapacity` parameter must not be negative.
     public init(minimumCapacity: Int, sort: @escaping(Element, Element) -> Bool) {
         self.storage = Storage(minimumCapacity, sort: sort)
     }
@@ -204,15 +205,17 @@ extension IndexedPriorityQueue: Queue {
         storage = Storage(c, sort: s)
     }
     
-    /// Returns an element associated to the given key, if such key has an element associated.
+    /// Access the element associated with the given key for for reading and writing.
     ///
-    /// - Parameter key: An `Int` value, that is the key to lookup in this indexed priority queue.
+    /// The key based subscript of an indexed priority queue works pretty much as it does in a dictionary,
+    /// except for the precondition that such key must be in range `0..<capacity>`. 
+    /// - Parameter key: An `Int` value, that is the key to find in this indexed priority queue.
     ///                     **Must be in range** `0..<capacity>`.
-    /// - Returns: An element stored in the indexed priority queue for that key if such has an element
-    ///            associated to it. Otherwise `nil`.
+    /// - Returns:  The element associated with the given key in this idexed priority queue,
+    ///             otherwise `nil`.
     /// - Complexity: O(log *N*) where *N* is the `capacity` value of this indexed priority queue.
-    /// - Warning: The value passed as `key` parameter must be in range `0..<capacity>`,
-    ///             otherwise a runtime error occurs.
+    /// - Precondition: The value passed as `key` parameter must be in range `0..<capacity>`,
+    ///                 otherwise a runtime error occurs.
     public subscript(key: Int) -> Element? {
         get {
             storage.getElement(for: key)
@@ -249,11 +252,121 @@ extension IndexedPriorityQueue: Queue {
     ///                     **Must be in range** `0..<capacity>`.
     /// - Returns:  A boolean value: `true` if the specified `key` parameter is
     ///             associated to a stored element in this indexed priority queue, `false` otherwise.
-    /// - Warning:  The specified parameter `key` must be in range `0..<capacity>`,
-    ///             otherwise a runtime error occurs.
+    /// - Precondition: The specified parameter `key` must be in range `0..<capacity>`,
+    ///                 otherwise a runtime error occurs.
     /// - Complexity: O(1).
     public func containsKey(_ key: Int) -> Bool {
         storage.getElement(for: key) != nil
+    }
+    
+}
+
+extension IndexedPriorityQueue where Element: Comparable {
+    /// Returns an empty indexed priority queue which adopts `<` as sort function over its elements,
+    /// able to store without having to reallocate memory at least the number of elements specified as
+    /// `miniumCapacity` parameter.
+    ///
+    /// The returned indexed priority queue will adopt as its priority criteria `>` comparator over its elements:
+    /// that is taking two elements `a` and `b`, then the smaller between the two has an higher priority.
+    /// Moreover elements will be associatable to a key in range of `0..<minimumCapacity>`.
+    /// - Parameter minimumCapacity:    The minimum number of elements this indexed priority queue
+    ///                                 will be able to store withouth having to reallocate its memory.
+    ///                                 **Must not be negative**.
+    ///                                 Note that the returned instance might have a real capacity
+    ///                                 greater than the value specified as this parameter.
+    /// - Returns: A new empty indexed priority queue where its element's priority is calculated
+    ///            by comparing elements' value with `<` comparator and able to store
+    ///            without reallocating memory at least the number of elements specified as
+    ///            `minimumCapacity` parameter.
+    public static func indexedMinPQ(minimumCapacity: Int) -> Self {
+        Self.init(minimumCapacity: minimumCapacity, sort: <)
+    }
+    
+    /// Returns an empty indexed priority queue which adopts `>` as sort function over its elements,
+    /// able to store without having to reallocate memory at least the number of elements specified as
+    /// `miniumCapacity` parameter.
+    ///
+    /// The returned indexed priority queue will adopt as its priority criteria `>` comparator over its elements:
+    /// that is taking two elements `a` and `b`, then the smaller between the two has an higher priority.
+    /// Moreover elements will be associatable to a key in range of `0..<minimumCapacity>`.
+    /// - Parameter minimumCapacity:    The minimum number of elements this indexed priority queue
+    ///                                 will be able to store withouth having to reallocate its memory.
+    ///                                 **Must not be negative**.
+    ///                                 Note that the returned instance might have a real capacity
+    ///                                 greater than the value specified as this parameter.
+    /// - Returns: A new empty indexed priority queue where its element's priority is calculated
+    ///            by comparing elements' value with `>` comparator and able to store
+    ///            without reallocating memory at least the number of elements specified as
+    ///            `minimumCapacity` parameter.
+    public static func indexedMaxPQ(minimumCapacity: Int) -> Self {
+        Self.init(minimumCapacity: minimumCapacity, sort: >)
+    }
+    
+    /// Returns an indexed priority queue which adopts `<` as sort function over its elements,
+    /// storing all elements contained in the specified sequence by associating them to their enumerating offset.
+    ///
+    /// The returned indexed priority queue will adopt as its priority criteria `>` comparator over its elements:
+    /// that is taking two elements `a` and `b`, then the smaller between the two has an higher priority.
+    /// Moreover elements will be associatable to a key in range of `0..<minimumCapacity>`.
+    /// - Parameter elements:   A finite sequence containing the elements to store in the
+    ///                         indexed priority queue.
+    /// - Returns:  A new  indexed priority queue where priority is calculated
+    ///             by comparing elements' value with `<` comparator, storing all elements in the
+    ///             specified sequence by associating them to their enumerating offset.
+    public static func indexedMinPQ<S: Sequence>(contentsOf elements: S) -> Self where S.Iterator.Element == Element {
+        self.init(contentsOf: elements, sort: <)
+    }
+    
+    /// Returns an indexed priority queue which adopts `>` as sort function over its elements,
+    /// storing all elements contained in the specified sequence by associating them to their enumerating offset.
+    ///
+    /// The returned indexed priority queue will adopt as its priority criteria `>` comparator over its elements:
+    /// that is taking two elements `a` and `b`, then the smaller between the two has an higher priority.
+    /// Moreover elements will be associatable to a key in range of `0..<minimumCapacity>`.
+    /// - Parameter elements:   A finite sequence containing the elements to store in the
+    ///                         indexed priority queue.
+    /// - Returns:  A new  indexed priority queue where priority is calculated
+    ///             by comparing elements' value with `>` comparator, storing all elements in the
+    ///             specified sequence by associating them to their enumerating offset.
+    public static func indexedMaxPQ<S: Sequence>(contentsOf elements: S) -> Self where S.Iterator.Element == Element {
+        self.init(contentsOf: elements, sort: >)
+    }
+    
+}
+
+extension IndexedPriorityQueue {
+    /// Create a new indexed priority queue with the given sort closure as comparator for
+    /// its element's priority, storing all elements in the speciofied sequence by associating
+    /// each one to their enumeration offset.
+    ///
+    /// - Parameter elements:   A finite sequence containing the elements to store in the
+    ///                         indexed priority queue.
+    /// - Parameter sort: A closure that given two elements returns either `true` if they are sorted,
+    ///                     or `false` if they aren't sorted.
+    ///                     Must be a *strict weak ordering function* over the elements.
+    public init<S: Sequence>(contentsOf elements: S, sort: @escaping(Element, Element) -> Bool) where S.Iterator.Element == Element {
+        let s: Storage<Element>? = elements
+            .withContiguousStorageIfAvailable({ buffer in
+                let _s = Storage(buffer.count, sort: sort)
+                for key in buffer.indices {
+                    _s.setElement(buffer[key], for: key)
+                }
+                
+                return _s
+            })
+        if let s = s {
+            self.storage = s
+        } else {
+            var _s = Storage(elements.underestimatedCount, sort: sort)
+            for (key, element) in elements.enumerated() {
+                if _s.isFull {
+                    _s = _s.copy(minimumCapacity: 1)
+                }
+                _s.setElement(element, for: key)
+            }
+            
+            self.storage = _s
+        }
     }
     
 }
