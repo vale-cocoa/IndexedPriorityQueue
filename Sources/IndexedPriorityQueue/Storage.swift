@@ -45,22 +45,14 @@ final internal class Storage<Element> {
     }
     
     deinit {
-        var deInitSize = 0
-        for i in 0..<capacity {
-            guard qp.advanced(by: 1).pointee != -1 else {
-                if deInitSize > 0 {
-                    elements.advanced(by: i).deinitialize(count: deInitSize)
-                    deInitSize = 0
-                }
-                continue
-            }
-            deInitSize += 1
-        }
-        self.elements.deallocate()
-        self.pq.deinitialize(count: count)
-        self.pq.deallocate()
-        self.qp.deinitialize(count: capacity)
-        self.qp.deallocate()
+        _deInitializeElements()
+        elements.deallocate()
+        
+        pq.deinitialize(count: count)
+        pq.deallocate()
+        
+        qp.deinitialize(count: capacity)
+        qp.deallocate()
     }
     
     fileprivate init(capacity: Int, count: Int, elements: UnsafeMutablePointer<Element>, pq: UnsafeMutablePointer<Int>, qp: UnsafeMutablePointer<Int>, sort: @escaping (Element, Element) -> Bool) {
@@ -116,14 +108,14 @@ extension Storage {
     internal func copy(minimumCapacity: Int = 0) -> Self {
         let newCapacity = residualCapacity >= minimumCapacity ? capacity : Self._convenientCapacityFor(capacity: (capacity + (minimumCapacity - residualCapacity)))
         let newPQ = UnsafeMutablePointer<Int>.allocate(capacity: newCapacity)
-        newPQ.moveInitialize(from: pq, count: count)
-        let newKeys = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
-        newKeys.moveInitialize(from: elements, count: capacity)
+        newPQ.initialize(from: pq, count: count)
+        let newElements = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
+        _intializeFromElements(to: newElements)
         let newQP = UnsafeMutablePointer<Int>.allocate(capacity: newCapacity)
-        newQP.moveInitialize(from: qp, count: capacity)
+        newQP.initialize(from: qp, count: capacity)
         newQP.advanced(by: capacity).initialize(repeating: -1, count: newCapacity - capacity)
         
-        return Self.init(capacity: newCapacity, count: count, elements: newKeys, pq: newPQ, qp: newQP, sort: sort)
+        return Self.init(capacity: newCapacity, count: count, elements: newElements, pq: newPQ, qp: newQP, sort: sort)
     }
     
     @usableFromInline
@@ -141,7 +133,7 @@ extension Storage {
         _validateKey(key)
         guard qp.advanced(by: key).pointee != -1 else { return nil }
         
-        return elements.advanced(by:key).pointee
+        return elements.advanced(by: key).pointee
     }
     
     @usableFromInline
@@ -169,7 +161,7 @@ extension Storage {
             
             // newElement goes in place of a previous stored element,
             // let's get the old element, return it and then change it with
-            // the newElement mainining the heap property
+            // the newElement maintaining the heap property
             let oldElement = elements.advanced(by: key).pointee
             defer {
                 elements.advanced(by: key).pointee = newElement
@@ -212,32 +204,34 @@ extension Storage {
     func peek() -> (key: Int, element: Element)? {
         guard !isEmpty else { return nil }
         
-        let idx = pq.pointee
+        let key = pq.pointee
         
-        return (idx, elements.advanced(by: idx).pointee)
+        return (key, elements.advanced(by: key).pointee)
     }
     
     @usableFromInline
     @discardableResult
     func push(_ element: Element) -> Int {
         assert(!isFull, "Attempting to push an element into a full storage")
-        let idx = _smallestFreeKey!
+        
+        let key = _smallestFreeKey!
         
         defer {
-            qp.advanced(by: idx).pointee = count
-            pq.advanced(by: count).initialize(to: idx)
-            elements.advanced(by: idx).initialize(to: element)
+            qp.advanced(by: key).pointee = count
+            pq.advanced(by: count).initialize(to: key)
+            elements.advanced(by: key).initialize(to: element)
             _siftUp(from: count)
             count += 1
         }
         
-        return idx
+        return key
     }
     
     @usableFromInline
     @discardableResult
     func pop() -> (key: Int, element: Element) {
         assert(!isEmpty, "Attempting to pop an element from an empty storage")
+        
         let min = pq.pointee
         defer {
             _swapAt(0, count - 1)
@@ -253,8 +247,8 @@ extension Storage {
     
 }
 
-// MARK: - fileprivate helpers
-// MARK: - Heap helpers
+// MARK: - Private Helpers
+// MARK: - Heap operations helpers
 extension Storage {
     @inline(__always)
     private func _leftChildIndexOf(parentAt idx: Int) -> Int {
@@ -324,25 +318,8 @@ extension Storage {
     
 }
 
-// MARK: - Capacity helpers
+// MARK: - Keys helpers
 extension Storage {
-    @inlinable
-    internal static var minCapacity: Int { 4 }
-    
-    // Returns the next power of 2 for given capacity value, or minCapacity for
-    // a given value less than or equal to 2.
-    // Returned value is clamped to Int.max, and given value must not be negative.
-    @inline(__always)
-    fileprivate static func _convenientCapacityFor(capacity: Int) -> Int {
-        precondition(capacity >= 0, "Negative capacity values are not allowed.")
-        
-        guard capacity > (minCapacity >> 1) else { return minCapacity }
-        
-        guard capacity < ((Int.max >> 1) + 1) else { return Int.max }
-        
-        return 1 << (Int.bitWidth - (capacity - 1).leadingZeroBitCount)
-    }
-    
     @inline(__always)
     fileprivate var _smallestFreeKey: Int? {
         guard !isEmpty else { return 0 }
@@ -380,10 +357,35 @@ extension Storage {
     }
     
     @inline(__always)
-    fileprivate func _validateKey(_ index: Int) {
-        precondition(0..<capacity ~= index, "index: \(index) is out bounds 0..<\(capacity)")
+    fileprivate func _validateKey(_ key: Int) {
+        precondition(0..<capacity ~= key, "key: \(key) is out bounds 0..<\(capacity)")
     }
     
+}
+
+// MARK: - Capacity helpers
+extension Storage {
+    @inlinable
+    internal static var minCapacity: Int { 4 }
+    
+    // Returns the next power of 2 for given capacity value, or minCapacity for
+    // a given value less than or equal to 2.
+    // Returned value is clamped to Int.max, and given value must not be negative.
+    @inline(__always)
+    fileprivate static func _convenientCapacityFor(capacity: Int) -> Int {
+        precondition(capacity >= 0, "Negative capacity values are not allowed.")
+        
+        guard capacity > (minCapacity >> 1) else { return minCapacity }
+        
+        guard capacity < ((Int.max >> 1) + 1) else { return Int.max }
+        
+        return 1 << (Int.bitWidth - (capacity - 1).leadingZeroBitCount)
+    }
+    
+}
+
+// MARK: - Resizing helpers
+extension Storage {
     @inline(__always)
     fileprivate func _resizeTo(newCapacity: Int) {
         guard capacity != newCapacity else { return }
@@ -392,10 +394,12 @@ extension Storage {
         newPQ.moveInitialize(from: pq, count: count)
         pq.deallocate()
         pq = newPQ
+        
         let newElements = UnsafeMutablePointer<Element>.allocate(capacity: newCapacity)
         _moveInitializeFromElements(to: newElements)
         elements.deallocate()
         elements = newElements
+        
         let newQP = UnsafeMutablePointer<Int>.allocate(capacity: newCapacity)
         if newCapacity > capacity {
             // We are increasing capacity… Easy peasy!
@@ -416,19 +420,21 @@ extension Storage {
         }
         qp.deallocate()
         qp = newQP
+        
         capacity = newCapacity
     }
     
 }
 
-// MARK: - other helpers
+// MARK: - Common pointer operations on elements helpers
 extension Storage {
     @inline(__always)
     fileprivate func _deInitializeElements() {
         guard !isEmpty else { return }
         
-        for i in 0..<capacity where qp.advanced(by: i).pointee != -1 {
-            elements.advanced(by: i).deinitialize(count: 1)
+        for i in 0..<count {
+            let key = pq.advanced(by: i).pointee
+            elements.advanced(by: key).deinitialize(count: 1)
         }
     }
     
@@ -436,8 +442,19 @@ extension Storage {
     fileprivate func _moveInitializeFromElements(to newBuffer: UnsafeMutablePointer<Element>) {
         guard !isEmpty else { return }
         
-        for i in 0..<capacity where qp.advanced(by: i).pointee != -1 {
-            newBuffer.advanced(by: i).moveInitialize(from: elements.advanced(by: i), count: 1)
+        for i in 0..<count {
+            let key = pq.advanced(by: i).pointee
+            newBuffer.advanced(by: key).moveInitialize(from: elements.advanced(by: key), count: 1)
+        }
+    }
+    
+    @inline(__always)
+    fileprivate func _intializeFromElements(to newBuffer: UnsafeMutablePointer<Element>) {
+        guard !isEmpty else { return }
+        
+        for i in 0..<count {
+            let key = pq.advanced(by: i).pointee
+            newBuffer.advanced(by: key).initialize(to: elements.advanced(by: key).pointee)
         }
     }
     

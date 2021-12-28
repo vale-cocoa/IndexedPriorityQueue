@@ -177,7 +177,6 @@ extension IndexedPriorityQueue: Queue {
         }
     }
     
-    @discardableResult
     /// Removes and returns the first element of the queue, or `nil` when the queue is empty.
     /// When an element is effectively removed and returned from the indexed priority queue,
     /// than the to which it was associated becomes also available again for associating it to a new
@@ -185,6 +184,7 @@ extension IndexedPriorityQueue: Queue {
     ///
     /// - Returns: the first element of the queue, or `nil` when the queue is empty.
     /// - Complexity: O(log *n*), where *n* is the count of elements stored in this indexed priority queue.
+    @discardableResult
     public mutating func dequeue() -> Element? {
         defer {
             storage.optimizeCapacity()
